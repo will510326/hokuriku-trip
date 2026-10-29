@@ -1,0 +1,19 @@
+{
+  "name": "scratch-2026-10-29-ddd76b",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild src/main.js --bundle --minify --format=iife --outfile=app.js",
+    "watch": "esbuild src/main.js --bundle --format=iife --outfile=app.js --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.186.1"
+  }
+}

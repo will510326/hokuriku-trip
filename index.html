@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trip World — 冬季北陸・飛驒 自駕行程</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="logo"><span>❄</span>Trip World</div>
+    <div class="trip">北陸・飛驒 冬季自駕（2027/1/13–20） <em>8天7夜</em></div>
+    <div class="search">
+      <input id="search" placeholder="搜尋地點、景點、美食…" autocomplete="off">
+      <div id="results" hidden></div>
+    </div>
+    <button class="bell" title="行前任務" onclick="document.querySelector('[data-view=tasks]').click()">🔔<span id="taskdot"></span></button>
+    <div class="who"><span>4</span><div>四人自駕<small>2027 冬</small></div></div>
+  </header>
+
+  <main id="world"></main>
+  <div class="notice">🚗 動畫為自駕路線模擬，地形與位置為示意，非實際道路。</div>
+
+  <nav class="rail">
+    <button data-view="overview" title="世界總覽">🌐<span>總覽</span></button>
+    <button data-view="days" title="每日行程">📅<span>行程</span></button>
+    <button data-view="stays" title="住宿">🛏<span>住宿</span></button>
+    <button data-view="budget" title="預算">💴<span>預算</span></button>
+    <button data-view="snow" title="雪況應變">❄️<span>雪況</span></button>
+    <button data-view="food" title="美食">🍣<span>美食</span></button>
+    <button data-view="tasks" title="行前任務">✅<span>任務</span></button>
+  </nav>
+  <aside id="panel"></aside>
+
+  <div class="ctrl">
+    <button id="zin" title="放大">＋</button>
+    <button id="zout" title="縮小">－</button>
+    <button id="home" title="回到全景">⌂</button>
+    <button id="play" title="暫停／播放動畫">⏸</button>
+    <button id="snowbtn" title="下雪效果">❄</button>
+  </div>
+
+  <footer class="status">
+    <div class="prog" title="行前任務完成度">準備度 <b id="pct">0%</b><span class="pbar"><i id="pctbar"></i></span></div>
+    <div id="daychips"></div>
+    <div id="carinfo"></div>
+    <button id="nexttask"></button>
+    <div id="countdown"></div>
+  </footer>
+  <div id="lightbox" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
