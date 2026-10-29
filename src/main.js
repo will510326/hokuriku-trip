@@ -263,6 +263,8 @@ $('#zin').onclick = () => world.zoom(0.7);
 $('#zout').onclick = () => world.zoom(1.4);
 $('#home').onclick = () => { world.home(); world.highlightDay(null); };
 $('#play').onclick = (e) => { world.setAnimate(!world.animate); e.currentTarget.textContent = world.animate ? '⏸' : '▶'; };
+const TOD = [['day', '☀️'], ['dusk', '🌆'], ['night', '🌙']];
+$('#tod').onclick = (e) => { const i = (TOD.findIndex(([k]) => k === world.time) + 1) % 3; world.setTime(TOD[i][0]); e.currentTarget.textContent = TOD[i][1]; };
 let snowOn = true;
 $('#snowbtn').onclick = (e) => { snowOn = !snowOn; world.setSnow(snowOn); e.currentTarget.classList.toggle('off', !snowOn); };
 
