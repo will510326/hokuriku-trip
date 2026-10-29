@@ -318,4 +318,10 @@ $('#nexttask').onclick = () => VIEWS.tasks();
 renderStatus();
 
 // ---------- 離線（Service Worker） ----------
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // 新版 service worker 接手時自動重新整理一次，讓更新立刻生效
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js');
+}
