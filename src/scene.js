@@ -3,65 +3,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLACES, DAYS } from './data.js';
+import { proj, hash, vnoise, smooth, seeded, landSdf, heightAt, buildRoutes, BOAT_SPOTS, treePositions, PLACE_SCALE, NO_PLINTH, BRIDGE, BRIDGE_Y, ropewayTop } from './terrain.js';
+export { proj, heightAt };
 
-// ---------- 座標與地形 ----------
 export const DAY_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#14b8a6', '#a855f7', '#f97316', '#ec4899'];
-
-// 經緯度 → 世界座標（為了畫面好看，部分地點略微挪動）
-const NUDGE = { ghibli: [2.4, 1.3], shinhotaka: [0.6, -1.2], furukawa: [-0.7, -0.9] };
-export function proj(key) {
-  const p = PLACES[key];
-  const [nx, nz] = NUDGE[key] || [0, 0];
-  return new THREE.Vector3((p.lon - 137.05) * 24 + nx, 0, -(p.lat - 35.72) * 19 + nz);
-}
-
-function hash(x, z) {
-  const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
-  return s - Math.floor(s);
-}
-function vnoise(x, z) {
-  const xi = Math.floor(x), zi = Math.floor(z);
-  const xf = x - xi, zf = z - zi;
-  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
-  const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1);
-  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-}
-function fbm(x, z) {
-  let s = 0, amp = 0.5, f = 1;
-  for (let i = 0; i < 4; i++) { s += amp * vnoise(x * f, z * f); amp *= 0.5; f *= 2.03; }
-  return s;
-}
-const smooth = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
-const gauss = (x, z, cx, cz, rx, rz) => Math.exp(-(((x - cx) / rx) ** 2 + ((z - cz) / rz) ** 2));
-const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })(); // 固定亂數，每次畫面一致
-
-const PLACE_POS = Object.keys(PLACES).map((k) => [k, proj(k)]);
-
-function landSdf(x, z) {
-  const dx = Math.abs(x - 1.5) / 15.5, dz = Math.abs(z) / 21;
-  let d = (Math.pow(dx ** 4 + dz ** 4, 0.25) - 1) * 15 + (fbm(x * 0.25, z * 0.25) - 0.5) * 3;
-  d = Math.max(d, 15 - Math.hypot(x + 22, z + 26)); // 日本海
-  d = Math.max(d, 6 - Math.hypot(x + 6, z + 21));   // 伊勢灣
-  const ap = proj('airport');
-  d = Math.min(d, Math.hypot(x - ap.x, z - ap.z) - 1.7); // 中部機場人工島
-  return d;
-}
-
-export function heightAt(x, z) {
-  const sdf = landSdf(x, z);
-  const land = smooth(0.25, -0.35, sdf); // 海岸陡一點，像模型台座的斷面
-  let m = 0;
-  m += 5.2 * gauss(x, z, 12.5, -7, 3.6, 9);    // 北阿爾卑斯
-  m += 3.0 * gauss(x, z, -6, -6.5, 3.2, 3.5);  // 白山
-  m += 1.6 * gauss(x, z, 2.5, -3, 6, 5);       // 飛驒高地
-  m += 1.0 * gauss(x, z, -1, 4, 6, 4);         // 美濃丘陵
-  let h = 0.45 + (fbm(x * 0.6, z * 0.6) - 0.4) * 0.35 + m * (0.55 + fbm(x * 0.45 + 9, z * 0.45) * 0.9);
-  for (const [, p] of PLACE_POS) {
-    const f = gauss(x, z, p.x, p.z, 1.9, 1.9);
-    h = h * (1 - f) + 0.45 * f;
-  }
-  return -0.9 + (h + 0.9) * land;
-}
+const rand = seeded(7); // 固定亂數，每次畫面一致
 
 // ---------- 材質與小模型 ----------
 const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.85, ...extra });
@@ -140,21 +86,30 @@ function torii(x, z, rot = 0) {
   g.add(box(0.48, 0.05, 0.07, M.red, 0, 0.4)); g.add(box(0.4, 0.03, 0.05, M.red, 0, 0.32)); g.add(box(0.48, 0.02, 0.08, M.snow, 0, 0.45));
   g.position.set(x, 0, z); g.rotation.y = rot; return g;
 }
-function crowd(g, n, r = 0.9) {
-  for (let i = 0; i < n; i++) { const a = rand() * 6.28, d = 0.3 + rand() * r; g.add(person(Math.cos(a) * d, Math.sin(a) * d, rand() > 0.5 ? M.coat : M.coat2)); }
+// 行人：固定位置（避開建築、水道）
+function people(g, spots) { spots.forEach(([x, z], i) => g.add(person(x, z, i % 2 ? M.coat2 : M.coat))); }
+
+// 船：尖船頭的船身（俯視輪廓擠出）
+function boatHull(color) {
+  const s = new THREE.Shape();
+  s.moveTo(-0.32, -0.11); s.lineTo(0.14, -0.11); s.quadraticCurveTo(0.3, -0.08, 0.36, 0); s.quadraticCurveTo(0.3, 0.08, 0.14, 0.11); s.lineTo(-0.32, 0.11); s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 1 });
+  g.rotateX(-Math.PI / 2); // 擠出方向朝上
+  return new THREE.Mesh(g, color);
 }
 
+// 所有模型都控制在半徑約 1.25 內（六角台座半徑 1.32）
 const BUILDERS = {
-  airport() {
+  airport() { // 人工島：跑道在南、航廈在北，中間留給聯絡道路
     const g = new THREE.Group();
-    g.add(box(2.6, 0.04, 0.42, M.road, 0, 0, 0.3));
-    for (let i = -1; i <= 1; i += 0.4) g.add(box(0.18, 0.045, 0.04, M.snow, i, 0, 0.3));
-    g.add(box(1.0, 0.3, 0.45, M.glass, 0.2, 0, -0.35));
-    g.add(box(0.12, 0.6, 0.12, M.concrete, -0.7, 0, -0.35));
-    g.add(box(0.24, 0.12, 0.24, M.glass, -0.7, 0.6, -0.35));
+    g.add(box(2.0, 0.04, 0.4, M.road, 0, 0, 0.36));
+    for (let i = -0.8; i <= 0.8; i += 0.4) g.add(box(0.16, 0.045, 0.04, M.snow, i, 0, 0.36));
+    g.add(box(0.9, 0.3, 0.4, M.glass, 0.15, 0, -0.62));
+    g.add(box(0.12, 0.6, 0.12, M.concrete, -0.65, 0, -0.55));
+    g.add(box(0.24, 0.12, 0.24, M.glass, -0.65, 0.6, -0.55));
     const plane = new THREE.Group();
-    plane.add(box(0.7, 0.1, 0.12, M.snow)); plane.add(box(0.18, 0.03, 0.8, M.snow, 0, 0.04)); plane.add(box(0.1, 0.18, 0.03, M.red, -0.3, 0.05));
-    plane.position.set(-0.6, 0.05, 0.3); g.add(plane);
+    plane.add(box(0.6, 0.1, 0.12, M.snow)); plane.add(box(0.16, 0.03, 0.66, M.snow, 0, 0.04)); plane.add(box(0.1, 0.16, 0.03, M.red, -0.26, 0.05));
+    plane.position.set(-0.45, 0.05, 0.36); g.add(plane);
     g.userData.plane = plane; return g;
   },
   castle() { // 名古屋城＋車站大樓
@@ -163,47 +118,49 @@ const BUILDERS = {
     g.add(box(0.6, 0.3, 0.6, M.wall, 0, 0.18)); g.add(pyramid(0.85, 0.2, M.roofGreen, 0, 0.48));
     g.add(box(0.42, 0.25, 0.42, M.wall, 0, 0.68)); g.add(pyramid(0.6, 0.22, M.roofGreen, 0, 0.93));
     g.add(box(0.06, 0.08, 0.06, M.gold, 0.12, 1.08)); g.add(box(0.06, 0.08, 0.06, M.gold, -0.12, 1.08));
-    [[1.2, 1.3, -0.6], [1.6, 1.6, -0.1], [1.25, 1.1, 0.5], [-1.2, 0.8, 0.6]].forEach(([x, h, z]) => g.add(box(0.36, h, 0.36, M.glass, x, 0, z)));
-    g.add(pine(-1.0, -0.6, 1)); g.add(pine(-0.7, -0.9, 0.8));
-    crowd(g, 6, 1.0);
+    [[0.78, 1.3, -0.58], [0.9, 1.6, -0.08], [0.76, 1.1, 0.5], [-0.8, 0.8, 0.55]].forEach(([x, h, z]) => g.add(box(0.32, h, 0.32, M.glass, x, 0, z)));
+    g.add(pine(-0.75, -0.45, 1)); g.add(pine(-0.45, -0.8, 0.8));
+    people(g, [[0, 0.72], [0.32, 0.8], [-0.4, 0.82], [0.55, -0.9], [-0.7, 0.05]]);
     return g;
   },
-  town() {
+  town() { // 兩排房子夾一條水道，水道上有小橋
     const g = new THREE.Group();
-    [[-0.5, -0.3, 0.2], [0.2, -0.5, 0], [0.6, 0.2, 1.5], [-0.3, 0.5, 1.4], [0.9, -0.5, 0.3]].forEach(([x, z, r]) => g.add(house(x, z, r)));
-    g.add(box(2.2, 0.03, 0.22, M.water, 0, 0, 0.05));
-    g.add(pine(-1.0, 0.2)); g.add(pine(0.9, 0.7, 0.8)); g.add(lantern(-0.1, 0.25)); g.add(snowman(0.35, 0.6));
-    crowd(g, 4, 0.7);
+    [[-0.6, -0.5], [0.04, -0.56], [0.66, -0.46]].forEach(([x, z]) => g.add(house(x, z, 0)));
+    [[-0.3, 0.6], [0.48, 0.6]].forEach(([x, z]) => g.add(house(x, z, Math.PI)));
+    g.add(box(1.9, 0.03, 0.22, M.water, 0, 0, 0));
+    g.add(box(0.2, 0.06, 0.32, M.red, 0.2, 0.02, 0));
+    g.add(pine(-0.85, 0.32)); g.add(pine(0.95, 0.3, 0.7)); g.add(lantern(-0.05, 0.22)); g.add(snowman(0.05, -0.24));
+    people(g, [[-0.5, 0.22], [0.35, -0.22], [0.62, 0.2], [-0.38, -0.22]]);
     return g;
   },
-  oldtown() { // 高山：古街＋紅色中橋
+  oldtown() { // 高山：古街兩排町屋＋宮川上的紅色中橋
     const g = new THREE.Group();
-    for (let i = 0; i < 5; i++) { g.add(house(-1 + i * 0.45, -0.45, 0, M.wood)); g.add(house(-1 + i * 0.45, 0.45, Math.PI, M.wood)); }
-    g.add(box(0.3, 0.03, 1.9, M.water, 1.25, 0, 0));
-    g.add(box(0.5, 0.08, 0.22, M.red, 1.25, 0.06, 0));
-    g.add(torii(-0.95, 0.95, 0.3)); g.add(lantern(0.4, 0)); g.add(lantern(-0.4, 0));
-    crowd(g, 6, 0.6);
+    for (let i = 0; i < 4; i++) { g.add(house(-0.78 + i * 0.45, -0.42, 0, M.wood, 0.85)); g.add(house(-0.78 + i * 0.45, 0.42, Math.PI, M.wood, 0.85)); }
+    g.add(box(0.24, 0.03, 0.9, M.water, 0.9, 0, 0));
+    g.add(box(0.38, 0.08, 0.2, M.red, 0.9, 0.04, 0));
+    g.add(torii(-0.4, 0.85, 0)); g.add(lantern(0.25, 0)); g.add(lantern(-0.45, 0));
+    people(g, [[-0.8, 0.06], [-0.2, -0.1], [0.05, 0.1], [0.55, -0.06], [0.9, 0.04]]);
     return g;
   },
   gassho() {
     const g = new THREE.Group();
-    [[-0.6, -0.5, 0.1], [0.3, -0.6, -0.2], [0.8, 0.2, 0.2], [-0.2, 0.4, 0], [-0.9, 0.5, 0.3]].forEach(([x, z, r]) => g.add(gassho(x, z, r)));
-    g.add(pine(0.2, 1.0, 0.8)); g.add(pine(1.0, -0.7, 0.7)); g.add(snowman(0.4, 0.75));
-    crowd(g, 5, 0.9);
+    [[-0.5, -0.4, 0.1], [0.35, -0.5, -0.2], [0.55, 0.42, 0.2], [-0.35, 0.45, 0]].forEach(([x, z, r]) => g.add(gassho(x, z, r)));
+    g.add(snowman(0.1, 0.75));
+    people(g, [[-0.05, 0.0], [0.2, 0.05], [0.95, -0.2]]);
     return g;
   },
-  garden() { // 金澤：城＋兼六園雪吊
+  garden() { // 金澤：城＋兼六園雪吊＋池塘
     const g = new THREE.Group();
     g.add(box(0.8, 0.12, 0.6, M.stone, -0.5, 0, -0.35));
     g.add(box(0.6, 0.35, 0.36, M.wall, -0.5, 0.12, -0.35)); g.add(prism(0.76, 0.24, 0.46, M.concrete, -0.5, 0.47, -0.35));
-    const pond = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.03, 16), M.water); pond.position.set(0.45, 0.02, 0.35); g.add(pond);
-    for (const [x, z] of [[-0.1, 0.55], [0.85, -0.25], [0.3, -0.45]]) {
+    const pond = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.03, 16), M.water); pond.position.set(0.45, 0.02, 0.38); g.add(pond);
+    for (const [x, z] of [[-0.15, 0.6], [0.8, -0.3], [0.25, -0.6]]) {
       g.add(pine(x, z, 1.0));
-      const rope = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.85, 10, 1, true), new THREE.MeshBasicMaterial({ color: '#c9a86b', wireframe: true }));
+      const rope = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.85, 10, 1, true), new THREE.MeshBasicMaterial({ color: '#c9a86b', wireframe: true }));
       rope.position.set(x, 0.5, z); g.add(rope);
     }
-    g.add(lantern(0.85, 0.55)); g.add(lantern(0.05, 0.05));
-    crowd(g, 5, 0.8);
+    g.add(lantern(0.05, 0.05));
+    people(g, [[-0.3, 0.22], [-0.65, 0.35], [0.4, 0.92], [1.0, 0.15]]);
     return g;
   },
   onsen() {
@@ -213,46 +170,65 @@ const BUILDERS = {
     g.add(prism(1.15, 0.28, 0.6, M.dark, -0.3, 0.35, -0.3)); g.add(prism(1.0, 0.14, 0.62, M.snow, -0.3, 0.5, -0.3));
     const pool = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 12), M.water); pool.position.set(0.5, 0.03, 0.4); g.add(pool);
     for (let i = 0; i < 9; i++) { const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.09), M.stone); const a = (i / 9) * Math.PI * 2; r.position.set(0.5 + Math.cos(a) * 0.45, 0.04, 0.4 + Math.sin(a) * 0.45); g.add(r); }
-    g.add(lantern(0.0, 0.55)); g.add(lantern(0.95, 0.0));
+    g.add(lantern(-0.35, 0.45)); g.add(lantern(0.98, -0.1));
+    people(g, [[-0.65, 0.2], [-0.1, 0.18]]);
     const steam = [];
     const sm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false });
     for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), sm.clone()); s.position.set(0.5, 0.1 + i * 0.15, 0.4); s.userData.t = i / 7; g.add(s); steam.push(s); }
     g.userData.steam = steam; return g;
   },
-  ropeway() {
+  ropeway() { // 山頂站高度在放到地圖上後依地形決定
     const g = new THREE.Group();
     g.add(box(0.5, 0.35, 0.4, M.concrete, -0.8, 0, 0.6));
-    const topY = 2.6;
-    g.add(box(0.4, 0.3, 0.35, M.concrete, 0.9, topY, -0.7));
-    const pts = [new THREE.Vector3(-0.8, 0.45, 0.6), new THREE.Vector3(0.9, topY + 0.2, -0.7)];
-    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#333' })));
+    const top = box(0.4, 0.3, 0.35, M.concrete, 0.9, 0, -0.7); g.add(top);
+    const cableGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    g.add(new THREE.Line(cableGeo, new THREE.LineBasicMaterial({ color: '#333' })));
     const gondola = box(0.18, 0.16, 0.14, M.red); g.add(gondola);
-    g.userData.cable = pts; g.userData.gondola = gondola; return g;
+    g.userData.top = top; g.userData.cableGeo = cableGeo; g.userData.gondola = gondola; return g;
   },
   lodge() {
     const g = new THREE.Group();
     g.add(box(0.9, 0.36, 0.6, M.wood));
     g.add(box(0.16, 0.12, 0.02, M.window, -0.2, 0.12, 0.305)); g.add(box(0.16, 0.12, 0.02, M.window, 0.2, 0.12, 0.305));
     g.add(prism(1.05, 0.4, 0.7, M.dark, 0, 0.36)); g.add(prism(0.9, 0.22, 0.72, M.snow, 0, 0.55));
-    g.add(box(0.3, 0.12, 0.18, M.red, 0.8, 0, 0.3)); // 車
-    g.add(pine(-0.8, -0.4)); g.add(pine(-0.6, 0.5, 0.8)); g.add(snowman(0.3, 0.7));
+    g.add(box(0.3, 0.12, 0.18, M.red, 0.8, 0, 0.42)); // 停好的車
+    g.add(pine(-0.8, -0.4)); g.add(pine(-0.6, 0.6, 0.8)); g.add(snowman(0.25, 0.75));
     return g;
   },
   ghibli() {
     const g = new THREE.Group();
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.8, 7), M.trunk); trunk.position.set(-0.4, 0.4, 0); g.add(trunk);
     const crown = mat('#4f9a62');
-    [[-0.4, 1.0, 0, 0.55], [-0.75, 0.85, 0.2, 0.38], [-0.05, 0.85, -0.15, 0.4], [-0.4, 1.35, 0.05, 0.35]].forEach(([x, y, z, r]) => {
+    [[-0.4, 1.0, 0, 0.55], [-0.72, 0.85, 0.2, 0.38], [-0.08, 0.85, -0.15, 0.4], [-0.4, 1.35, 0.05, 0.35]].forEach(([x, y, z, r]) => {
       const s = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), crown); s.position.set(x, y, z); s.castShadow = true; g.add(s);
     });
     g.add(box(0.5, 0.4, 0.4, M.wall, 0.6, 0, 0.2)); g.add(box(0.12, 0.12, 0.02, M.window, 0.6, 0.15, 0.405));
     g.add(prism(0.62, 0.3, 0.5, M.orange, 0.6, 0.4, 0.2));
-    g.add(box(0.14, 0.7, 0.14, M.wall, 0.95, 0, -0.35)); g.add(pyramid(0.24, 0.22, M.red, 0.95, 0.7, -0.35));
-    crowd(g, 6, 0.9);
+    g.add(box(0.14, 0.7, 0.14, M.wall, 0.9, 0, -0.4)); g.add(pyramid(0.24, 0.22, M.red, 0.9, 0.7, -0.4));
+    people(g, [[0.1, 0.62], [-0.3, 0.75], [0.3, -0.5], [-0.8, -0.6], [0.05, 0.05]]);
     return g;
   },
 };
-const NO_PLINTH = new Set(['ropeway', 'airport']);
+
+// 模型若超出六角台面（內切半徑 1.14），等比例縮小到剛好放得下
+function hexExtent(obj) {
+  obj.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert(), v = new THREE.Vector3();
+  let max = 0;
+  obj.traverse((m) => {
+    if (!m.isMesh) return;
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+      max = Math.max(max, Math.abs(v.z), Math.abs(0.866 * v.x + 0.5 * v.z), Math.abs(0.866 * v.x - 0.5 * v.z));
+    }
+  });
+  return max;
+}
+function fitToHex(model, limit) {
+  const e = hexExtent(model);
+  if (e > limit) model.scale.multiplyScalar(limit / e);
+}
 
 // 地平線的漸層天空（白天／黃昏／夜晚）
 function skyTexture(top, bottom) {
@@ -365,7 +341,10 @@ export function createWorld(container, { onPick }) {
     const s = new THREE.Mesh(new THREE.ConeGeometry(h * 0.9 * 0.3, h * 0.3, m.geometry.parameters.radialSegments), farSnow); s.position.set(x, h - 1 - h * 0.15 + 0.01, z); s.rotation.y = m.rotation.y; scene.add(s);
   }
 
-  // 樹林：雪松（三層）＋圓樹
+  // 路線資料（道路只走陸地，往機場走聯絡橋）
+  const routes = buildRoutes();
+
+  // 樹林：雪松（三層）＋圓樹；位置避開海、台座與道路
   const tiers = [], caps = [];
   [[0.26, 0.34, 0.25], [0.2, 0.3, 0.45], [0.13, 0.24, 0.63]].forEach(([r, h, y]) => {
     tiers.push(new THREE.ConeGeometry(r, h, 6).translate(0, y, 0));
@@ -375,27 +354,18 @@ export function createWorld(container, { onPick }) {
   const pineGeo = mergeGeometries(tiers), pineCap = mergeGeometries(caps);
   const roundGeo = mergeGeometries([new THREE.IcosahedronGeometry(0.24, 0).translate(0, 0.42, 0), new THREE.CylinderGeometry(0.035, 0.045, 0.24, 5).translate(0, 0.12, 0).toNonIndexed()]);
   const roundCap = new THREE.IcosahedronGeometry(0.17, 0).scale(1, 0.55, 1).translate(0, 0.58, 0);
-  const NP = 380, NR = 130;
+  const tp = treePositions(routes, 380, 130);
   const greenMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 });
-  const pines = new THREE.InstancedMesh(pineGeo, greenMat, NP), pineCaps = new THREE.InstancedMesh(pineCap, M.snow, NP);
-  const rounds = new THREE.InstancedMesh(roundGeo, greenMat.clone(), NR), roundCaps = new THREE.InstancedMesh(roundCap, M.snow, NR);
+  const pines = new THREE.InstancedMesh(pineGeo, greenMat, tp.pines.length), pineCaps = new THREE.InstancedMesh(pineCap, M.snow, tp.pines.length);
+  const rounds = new THREE.InstancedMesh(roundGeo, greenMat.clone(), tp.rounds.length), roundCaps = new THREE.InstancedMesh(roundCap, M.snow, tp.rounds.length);
   [pines, rounds, pineCaps, roundCaps].forEach((m) => (m.castShadow = true));
   const dummy = new THREE.Object3D(), tc = new THREE.Color();
   const PINE_COLORS = ['#2f6b4f', '#3b7a58', '#28604a', '#467f5c'], ROUND_COLORS = ['#7fa77a', '#93b386', '#6e9b74', '#c99a5a'];
-  let np = 0, nr = 0;
-  for (let tries = 0; tries < 30000 && (np < NP || nr < NR); tries++) {
-    const x = -20 + rand() * 44, z = -26 + rand() * 52;
-    const h = heightAt(x, z);
-    if (h < 0.5 || h > 3.2) continue;
-    if (PLACE_POS.some(([, p]) => Math.hypot(p.x - x, p.z - z) < 2.6)) continue;
-    if (fbm(x * 0.35 + 3, z * 0.35) < 0.5) continue;
-    const s = 0.8 + rand() * 0.8;
-    dummy.position.set(x, h - 0.04, z); dummy.scale.setScalar(s); dummy.rotation.y = rand() * 6; dummy.updateMatrix();
-    const lowland = h < 1.1 && rand() < 0.45;
-    if (lowland && nr < NR) { rounds.setMatrixAt(nr, dummy.matrix); roundCaps.setMatrixAt(nr, dummy.matrix); rounds.setColorAt(nr, tc.set(ROUND_COLORS[Math.floor(rand() * 4)])); nr++; }
-    else if (np < NP) { pines.setMatrixAt(np, dummy.matrix); pineCaps.setMatrixAt(np, dummy.matrix); pines.setColorAt(np, tc.set(PINE_COLORS[Math.floor(rand() * 4)])); np++; }
-  }
-  pines.count = pineCaps.count = np; rounds.count = roundCaps.count = nr;
+  const placeTrees = (list, mesh, cap, palette) => list.forEach((t, i) => {
+    dummy.position.set(t.x, t.y, t.z); dummy.scale.setScalar(t.s); dummy.rotation.y = t.r; dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix); cap.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, tc.set(palette[Math.floor(t.c * palette.length)]));
+  });
+  placeTrees(tp.pines, pines, pineCaps, PINE_COLORS); placeTrees(tp.rounds, rounds, roundCaps, ROUND_COLORS);
   scene.add(pines, pineCaps, rounds, roundCaps);
 
   // 地點：六角台座＋模型＋標籤
@@ -409,12 +379,19 @@ export function createWorld(container, { onPick }) {
     const kind = PLACES[key].kind;
     const g = new THREE.Group();
     g.position.set(p.x, heightAt(p.x, p.z), p.z);
-    g.scale.setScalar(1.45);
+    g.scale.setScalar(PLACE_SCALE);
     const model = BUILDERS[kind]();
     if (!NO_PLINTH.has(kind)) {
       const hex = new THREE.Mesh(hexGeo, [M.plinth, M.plinthTop, M.plinth]); hex.position.y = -0.13; hex.rotation.y = Math.PI / 6; hex.castShadow = hex.receiveShadow = true; g.add(hex);
       const rim = new THREE.Mesh(hexRim, M.stone); rim.position.y = 0.1; rim.rotation.y = Math.PI / 6; g.add(rim);
       model.position.y = 0.13;
+      fitToHex(model, 1.12);
+    }
+    if (kind === 'ropeway') { // 山頂站放在真正的山上，纜繩跟著拉過去
+      const top = ropewayTop().sub(g.position).divideScalar(PLACE_SCALE);
+      model.userData.top.position.set(top.x, top.y, top.z);
+      const a = new THREE.Vector3(-0.8, 0.45, 0.6), b = new THREE.Vector3(top.x, top.y + 0.2, top.z);
+      model.userData.cableGeo.setFromPoints([a, b]); model.userData.cable = [a, b];
     }
     g.add(model);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.userData.place = key; } });
@@ -428,7 +405,7 @@ export function createWorld(container, { onPick }) {
       `<span class="meta">${stayNights[key] ? '🏨 ' + stayNights[key] : 'D' + days.join('・D')}</span>`;
     el.addEventListener('click', (e) => { e.stopPropagation(); onPick(key); });
     const label = new CSS2DObject(el);
-    label.position.set(0, { shinhotaka: 2.6, okuhida: 0.5, seto: 0.6, furukawa: 1.0 }[key] ?? 1.5, 0);
+    label.position.set(0, { shinhotaka: 1.4, okuhida: 0.5, seto: 0.6 }[key] ?? 1.5, 0);
     g.add(label);
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.68, 6), new THREE.MeshBasicMaterial({ color: '#e8643c', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.rotation.z = Math.PI / 6; ring.position.y = 0.16; g.add(ring);
@@ -439,7 +416,7 @@ export function createWorld(container, { onPick }) {
   function ribbon(points, width, closed) {
     const n = points.length, verts = [], idx = [];
     for (let i = 0; i < n; i++) {
-      const a = points[Math.max(0, i - 1)], b = points[Math.min(n - 1, i + 1)];
+      const a = points[closed ? (i - 1 + n) % n : Math.max(0, i - 1)], b = points[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
       const t = new THREE.Vector3(b.x - a.x, 0, b.z - a.z).normalize();
       const nx = -t.z * width / 2, nz = t.x * width / 2;
       const p = points[i];
@@ -451,58 +428,59 @@ export function createWorld(container, { onPick }) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3)); g.setIndex(idx); g.computeVertexNormals();
     return g;
   }
-  const lift = (v) => new THREE.Vector3(v.x, Math.max(heightAt(v.x, v.z), 0.05) + 0.07, v.z);
-  function legCurve(a, b) {
-    const A = proj(a), B = proj(b);
-    const mid = A.clone().add(B).multiplyScalar(0.5);
-    const perp = new THREE.Vector3(-(B.z - A.z), 0, B.x - A.x).normalize().multiplyScalar(A.distanceTo(B) * 0.08);
-    const base = new THREE.CatmullRomCurve3([A, mid.add(perp), B]);
-    return new THREE.CatmullRomCurve3(base.getPoints(60).map(lift));
-  }
   const routeMeshes = [];
   const fullPath = [];
+  const dayLens = [];
   const roadMat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, transparent: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   const edgeMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8, transparent: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 });
-  DAYS.forEach((d, i) => {
+  routes.forEach((legs, i) => {
     const group = new THREE.Group();
     const color = DAY_COLORS[i];
-    const add = (pts, closed) => {
-      const fine = new THREE.CatmullRomCurve3(pts, closed).getPoints(160).map(lift);
-      const edge = new THREE.Mesh(ribbon(fine, 0.42, closed), edgeMat.clone()); edge.receiveShadow = true; group.add(edge);
-      const road = new THREE.Mesh(ribbon(fine.map((v) => v.clone().setY(v.y + 0.01)), 0.28, closed), roadMat(color)); road.receiveShadow = true; group.add(road);
-    };
-    if (d.stops.length === 1) { // 定點日：繞一小圈
-      const p = proj(d.stops[0]);
-      const loop = [];
-      for (let k = 0; k < 40; k++) { const a = (k / 40) * Math.PI * 2; loop.push(lift(new THREE.Vector3(p.x + Math.cos(a) * 2.3, 0, p.z + Math.sin(a) * 2.3))); }
-      add(loop, true);
-      fullPath.push(...new THREE.CatmullRomCurve3(loop, true).getPoints(40));
-    } else {
-      for (let s = 0; s < d.stops.length - 1; s++) {
-        const curve = legCurve(d.stops[s], d.stops[s + 1]);
-        add(curve.points, false);
-        fullPath.push(...curve.getPoints(80));
-      }
-    }
-    group.userData.day = d.n;
+    let len = 0;
+    legs.forEach((l) => {
+      const pts = l.points;
+      const edge = new THREE.Mesh(ribbon(pts, 0.42, l.closed), edgeMat.clone()); edge.receiveShadow = true; group.add(edge);
+      const road = new THREE.Mesh(ribbon(pts.map((v) => v.clone().setY(v.y + 0.01)), 0.28, l.closed), roadMat(color)); road.receiveShadow = true; group.add(road);
+      const path = l.closed ? [...pts, pts[0]] : pts;
+      for (let k = 1; k < path.length; k++) len += path[k].distanceTo(path[k - 1]);
+      fullPath.push(...path);
+    });
+    dayLens.push(len);
+    group.userData.day = i + 1;
     scene.add(group); routeMeshes.push(group);
   });
+
+  // 中部機場聯絡橋
+  {
+    const [a, b] = BRIDGE, L = a.distanceTo(b), mid = a.clone().add(b).multiplyScalar(0.5);
+    const bridge = new THREE.Group();
+    bridge.add(box(L + 0.3, 0.08, 0.56, M.concrete, 0, -0.1, 0));
+    bridge.add(box(L + 0.3, 0.07, 0.03, M.red, 0, -0.02, 0.27)); bridge.add(box(L + 0.3, 0.07, 0.03, M.red, 0, -0.02, -0.27));
+    for (let x = -L / 2 + 0.3; x <= L / 2 - 0.2; x += 0.7) bridge.add(box(0.14, BRIDGE_Y + 0.25, 0.3, M.concrete, x, -(BRIDGE_Y + 0.35), 0));
+    bridge.position.set(mid.x, BRIDGE_Y, mid.z);
+    bridge.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
+    bridge.traverse((o) => { o.castShadow = o.receiveShadow = true; });
+    scene.add(bridge);
+  }
 
   // 自駕車（沿整趟路線循環移動）
   const car = new THREE.Group();
   car.add(box(0.42, 0.16, 0.24, M.red)); car.add(box(0.24, 0.12, 0.2, M.glass, -0.03, 0.16)); car.add(box(0.2, 0.04, 0.2, M.snow, -0.03, 0.28));
   [[-0.13, 0.13], [0.13, 0.13], [-0.13, -0.13], [0.13, -0.13]].forEach(([x, z]) => car.add(box(0.08, 0.08, 0.04, M.black, x, -0.03, z)));
   car.scale.setScalar(1.3); car.traverse((o) => (o.castShadow = true)); scene.add(car);
-  const carCurve = new THREE.CatmullRomCurve3(fullPath);
+  const carCurve = new THREE.CatmullRomCurve3(fullPath, false, 'centripetal');
   const carLen = fullPath.length;
 
-  // 船（日本海、伊勢灣）
+  // 船（日本海、伊勢灣、太平洋）：尖船頭、沿航線方向前進
   const boats = [];
-  const boatSpots = [[-14, -19, 2.5], [-17, -12, 3], [-8, 22, 2], [-3, 24, 2.5], [18, 6, 3], [-12, -24, 2.2]];
-  boatSpots.forEach(([x, z, r], i) => {
+  BOAT_SPOTS.forEach(([x, z, r], i) => {
     const b = new THREE.Group();
-    b.add(box(0.6, 0.12, 0.22, i % 2 ? M.wall : M.red)); b.add(box(0.22, 0.14, 0.16, M.wall, -0.08, 0.12)); b.add(box(0.06, 0.03, 0.18, M.window, -0.08, 0.2));
-    if (i % 3 === 0) { b.add(box(0.02, 0.5, 0.02, M.wood, 0.1, 0.12)); b.add(prism(0.3, 0.42, 0.01, M.snow, 0.17, 0.18)); }
+    b.add(boatHull(i % 2 ? M.wall : M.red));
+    b.add(box(0.2, 0.13, 0.15, M.wall, -0.1, 0.12)); b.add(box(0.21, 0.04, 0.16, M.window, -0.1, 0.17));
+    if (i % 3 === 0) { // 帆船：桅杆＋沿船身方向的三角帆
+      b.add(box(0.02, 0.55, 0.02, M.wood, 0.08, 0.12));
+      b.add(prism(0.32, 0.46, 0.01, M.snow, -0.08, 0.2, 0));
+    }
     b.scale.setScalar(1.4); b.traverse((o) => (o.castShadow = true));
     b.userData = { x, z, r, a: rand() * 6.28, s: 0.05 + rand() * 0.05 }; scene.add(b); boats.push(b);
   });
@@ -601,7 +579,7 @@ export function createWorld(container, { onPick }) {
       for (const b of boats) {
         const u = b.userData; u.a += dt * u.s;
         b.position.set(u.x + Math.cos(u.a) * u.r, 0.02 + Math.sin(t * 2 + u.x) * 0.03, u.z + Math.sin(u.a) * u.r);
-        b.rotation.y = -u.a; b.rotation.z = Math.sin(t * 1.5 + u.z) * 0.05;
+        b.rotation.y = -(u.a + Math.PI / 2); b.rotation.x = Math.sin(t * 1.5 + u.z) * 0.05; // 船頭朝前進方向
       }
       // 鏡頭拉近時雲淡出，避免穿過雲
       for (const cl of clouds) { cl.position.x += dt * 0.35; if (cl.position.x > 32) cl.position.x = -32; }
@@ -644,14 +622,30 @@ export function createWorld(container, { onPick }) {
       for (const [k, o] of Object.entries(placeObjs)) { o.ring.material.opacity = k === key ? 0.5 : 0; o.label.classList.toggle('active', k === key); o.label.classList.remove('dim'); }
       routeMeshes.forEach((g) => g.children.forEach((m) => (m.material.opacity = 1)));
     },
+    // 檢查用：每個地點模型離中心最遠的「六角形距離」（台座本地座標；台面內切半徑約 1.14）
+    debugExtents() {
+      const out = {}, v = new THREE.Vector3();
+      for (const [k, o] of Object.entries(placeObjs)) {
+        if (NO_PLINTH.has(PLACES[k].kind)) continue;
+        o.group.updateMatrixWorld(true);
+        let max = 0, worst = '';
+        o.group.children.forEach((c) => { if (c.isMesh) return; c.traverse((m) => {
+          if (!m.isMesh || m.geometry.type === 'RingGeometry') return;
+          const pos = m.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); o.group.worldToLocal(v); const r = Math.max(Math.abs(v.z), Math.abs(0.866 * v.x + 0.5 * v.z), Math.abs(0.866 * v.x - 0.5 * v.z)); if (r > max) { max = r; worst = m.geometry.type + '@' + v.x.toFixed(2) + ',' + v.z.toFixed(2); } }
+        }); });
+        out[k] = { max: +max.toFixed(2), worst };
+      }
+      return out;
+    },
     setPanelOffset(px) { panelOffset = window.innerWidth > 900 ? px : 0; },
     setAnimate(v) { state.animate = v; }, setSnow(v) { state.snow = v; snow.visible = v; },
     setTime, get time() { return timeKey; },
     get animate() { return state.animate; },
     onCarMove(fn) { listeners.push(fn); },
     dayAtCar(t) { // 由車子進度推算目前是第幾天
-      let acc = 0; const lens = DAYS.map((d) => (d.stops.length === 1 ? 41 : (d.stops.length - 1) * 81)); const total = lens.reduce((a, b) => a + b, 0);
-      for (let i = 0; i < lens.length; i++) { acc += lens[i]; if (t * total < acc) return i + 1; }
+      let acc = 0; const total = dayLens.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < dayLens.length; i++) { acc += dayLens[i]; if (t * total < acc) return i + 1; }
       return 8;
     },
   };

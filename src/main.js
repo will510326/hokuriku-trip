@@ -33,6 +33,7 @@ const saveTasks = () => { localStorage.setItem('trip-tasks', JSON.stringify([...
 
 // ---------- 3D 世界 ----------
 const world = createWorld($('#world'), { onPick: (key) => openPlace(key) });
+window.tripWorld = world; // 方便在瀏覽器主控台檢查畫面
 
 // ---------- 面板 ----------
 const panel = $('#panel');

@@ -6,12 +6,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "esbuild src/main.js --bundle --minify --format=iife --outfile=app.js",
-    "watch": "esbuild src/main.js --bundle --format=iife --outfile=app.js --watch"
+    "watch": "esbuild src/main.js --bundle --format=iife --outfile=app.js --watch",
+    "check": "node scripts/check.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "esbuild": "^0.28.2",
     "three": "^0.186.1"
