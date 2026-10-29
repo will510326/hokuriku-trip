@@ -51,6 +51,11 @@ a { color: inherit; }
 #panel header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 8px; }
 #panel h2 { margin: 0; font-size: 17px; }
 #panel .x { border: 0; background: none; font-size: 16px; color: var(--muted); }
+#panel header { gap: 8px; flex-wrap: wrap; }
+#panel header h2 { flex: 1; min-width: 0; }
+#panel .back { border: 1px solid #bfdbfe; background: #eff6ff; color: var(--brand); font-size: 13px; font-weight: 600; border-radius: 8px; padding: 4px 10px; white-space: nowrap; }
+#panel .back:hover { background: #dbeafe; }
+#panel .back + h2 { flex-basis: 100%; order: 2; }
 #panel .body { overflow-y: auto; padding: 4px 14px 18px; }
 #panel h3 { font-size: 14px; margin: 18px 0 8px; display: flex; align-items: center; gap: 8px; }
 .card { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: 13.5px; text-decoration: none; }

@@ -37,13 +37,17 @@ const world = createWorld($('#world'), { onPick: (key) => openPlace(key) });
 // ---------- 面板 ----------
 const panel = $('#panel');
 let current = null;
+let back = null; // 每日行程詳細頁的「返回」目標 { label, go }
+let lastPlace = null;
 function show(name, html, title) {
   current = name;
+  const isDay = name.startsWith('days:');
   document.querySelectorAll('.rail button').forEach((b) => b.classList.toggle('on', b.dataset.view === name.split(':')[0]));
-  panel.innerHTML = `<header><h2>${title}</h2><button class="x" aria-label="關閉">✕</button></header><div class="body">${html}</div>`;
+  panel.innerHTML = `<header>${isDay && back ? `<button class="back">← ${back.label}</button>` : ''}<h2>${title}</h2><button class="x" aria-label="關閉">✕</button></header><div class="body">${html}</div>`;
   panel.classList.add('open');
   world.setPanelOffset(240);
   $('.x', panel).onclick = closePanel;
+  if (isDay && back) $('.back', panel).onclick = () => { world.highlightDay(null); world.home(); back.go(); };
   panel.querySelectorAll('[data-day]').forEach((el) => (el.onclick = () => openDay(+el.dataset.day)));
   panel.querySelectorAll('[data-place]').forEach((el) => (el.onclick = (e) => { e.stopPropagation(); world.flyToPlace(el.dataset.place, 18); world.selectPlace(el.dataset.place); }));
   panel.querySelectorAll('img[data-zoom]').forEach((img) => (img.onclick = () => openLightbox(img.src, img.alt)));
@@ -198,7 +202,14 @@ function dayCard(d) {
   </button>`;
 }
 
+const BACK_LABELS = { overview: '總覽', days: '每日行程', budget: '預算', snow: '雪況應變', stays: '住宿', food: '美食', tasks: '任務', info: '資訊' };
 function openDay(n) {
+  // 從清單頁進來時記住返回目標；在各天之間切換（D3→D5）則沿用
+  if (!current || !current.startsWith('days:')) {
+    if (current === 'place' && lastPlace) { const k = lastPlace; back = { label: PLACES[k].name, go: () => openPlace(k) }; }
+    else if (current && VIEWS[current]) { const v = current; back = { label: BACK_LABELS[v], go: () => VIEWS[v]() }; }
+    else back = { label: '每日行程', go: () => VIEWS.days() };
+  }
   const d = DAYS[n - 1];
   world.highlightDay(n);
   show('days:' + n, `
@@ -230,6 +241,7 @@ function openPlace(key) {
   world.selectPlace(key);
   world.flyToPlace(key, 18);
   if (days.length === 1) return openDay(days[0].n);
+  lastPlace = key;
   const stay = STAYS.find((s) => s.place === key);
   const food = FOOD.find((f) => f.place === key);
   show('place', `
