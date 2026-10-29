@@ -1,4 +1,4 @@
-import { TRIP, PLACES, STAYS, STAY_NOTE, DAYS, BUDGET, RISKS, SNOW_STATS, DRIVING_RULES, FOOD } from './data.js';
+import { TRIP, PLACES, STAYS, STAY_NOTE, RENTAL, DAYS, BUDGET, RISKS, SNOW_STATS, DRIVING_RULES, FOOD, LINKS, EMERGENCY } from './data.js';
 import { createWorld, DAY_COLORS } from './scene.js';
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -7,6 +7,8 @@ const twd = (n) => 'NT$' + Math.round(n * TRIP.rate).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gmap = (r) => `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(r.from)}&destination=${encodeURIComponent(r.to)}&travelmode=${r.m === 'walk' ? 'walking' : 'driving'}`;
 const TONE = { blue: '#3b82f6', amber: '#f59e0b', green: '#10b981', red: '#ef4444' };
+const dayCost = (n) => BUDGET.rows[n - 1].reduce((a, b) => a + b, 0);
+const TOTAL = DAYS.reduce((a, d) => a + dayCost(d.n), 0);
 const daysUntil = (iso) => Math.ceil((new Date(iso) - new Date()) / 86400000);
 
 // ---------- 行前任務（存在 localStorage） ----------
@@ -18,6 +20,7 @@ const TASKS = [
   { id: 'okada', due: '2027-01-14', text: '岡田旅館（預付）：免費取消期限', tag: '住宿' },
   { id: 'lodge', due: '2027-01-14', text: '瀨戶 Lodge：免費取消期限', tag: '住宿' },
   { id: 'idp', due: '2026-12-31', text: '申請國際駕照／日文譯本', tag: '自駕' },
+  { id: 'rental', due: '2026-11-30', text: '租車下訂，並把租車公司、預約編號填進網站（src/data.js 的 RENTAL）', tag: '自駕' },
   { id: 'car', due: '2026-12-31', text: '租車：確認雪胎、加租雪鏈、冬季保險', tag: '自駕' },
   { id: 'crab', due: '2027-01-10', text: '金澤 1/17 蟹料理晚餐訂位（確認整隻蟹／時價／服務費）', tag: '餐廳' },
   { id: 'model', due: '2027-01-10', text: '郡上八幡食品模型體驗電話預約 0575-65-3378', tag: '體驗' },
@@ -65,7 +68,7 @@ const VIEWS = {
           <div><b>${d > 0 ? d : 0}</b><span>天後出發</span></div>
           <div><b>11</b><span>個地點</span></div>
           <div><b>5</b><span>處住宿</span></div>
-          <div><b>${twd(137631)}</b><span>人均預估</span></div>
+          <div><b>${twd(TOTAL)}</b><span>人均預估</span></div>
         </div>
       </div>
       <h3>路線</h3>
@@ -81,6 +84,19 @@ const VIEWS = {
   days() { show('days', DAYS.map(dayCard).join(''), '每日行程'); },
   stays() {
     show('stays', `
+      <h3>🚗 租車</h3>
+      <div class="card rental">
+        <div class="kv"><span>租車公司</span><b>${RENTAL.url ? `<a href="${esc(RENTAL.url)}" target="_blank" rel="noopener">${RENTAL.company} ↗</a>` : RENTAL.company}</b></div>
+        <div class="kv"><span>車型</span><b>${RENTAL.car}</b></div>
+        <div class="kv"><span>預約編號</span><b>${RENTAL.booking}</b></div>
+        <div class="kv"><span>費用</span><b>${RENTAL.price}</b></div>
+        <div class="kv"><span>取車</span><b>${RENTAL.pickup}</b></div>
+        <div class="kv"><span>還車</span><b>${RENTAL.dropoff}</b></div>
+        <div class="kv"><span>免費取消</span><b>${RENTAL.cancel}</b></div>
+        <div class="muted" style="margin-top:6px">取車時當場確認：</div>
+        <div class="checks">${RENTAL.checks.map((c) => `<span class="badge">☐ ${c}</span>`).join('')}</div>
+      </div>
+      <h3>🏨 住宿</h3>
       <p class="lead">固定兩處連住兩晚，減少搬運行李；最後一晚住瀨戶（近吉卜力公園）。</p>
       ${STAYS.map((s) => `
         <div class="card stay">
@@ -91,7 +107,7 @@ const VIEWS = {
           <div class="muted">${s.note}</div>
         </div>`).join('')}
       <div class="note">⚠️ ${STAY_NOTE}</div>
-    `, '住宿確定清單');
+    `, '住宿・租車');
   },
   budget() {
     const totals = BUDGET.cols.map((_, c) => BUDGET.rows.reduce((a, r) => a + r[c], 0));
@@ -148,6 +164,14 @@ const VIEWS = {
       ${f.items.map(([n, d]) => `<div class="card food"><b>${n}</b><small>${d}</small></div>`).join('')}`).join('') +
       '<div class="note">整理自 Threads 網友分享（食記為個人經驗，出發前請再次確認營業狀態與價格）。</div>', '在地美食');
   },
+  info() {
+    show('info', `
+      <h3>🆘 緊急電話</h3>
+      <div class="sos">${EMERGENCY.map(([n, l]) => `<a class="card" href="tel:${n.replace('#', '%23')}"><b>${n}</b><small>${l}</small></a>`).join('')}</div>
+      ${LINKS.map((g) => `<h3>${g.group}</h3>${g.items.map(([i, t, u, d]) => `<a class="card row link-card" href="${u}" target="_blank" rel="noopener"><span class="ico">${i}</span><div><b>${t} ↗</b><small>${d}</small></div></a>`).join('')}`).join('')}
+      <div class="note">📶 這個網站支援離線：在手機上用瀏覽器打開一次後「加到主畫面」，山區沒訊號也能看行程（外部連結仍需網路）。</div>
+    `, '實用資訊');
+  },
   tasks() {
     const sorted = [...TASKS].sort((a, b) => a.due.localeCompare(b.due));
     show('tasks', `
@@ -180,7 +204,7 @@ function openDay(n) {
   show('days:' + n, `
     <div class="day-head" style="--c:${DAY_COLORS[n - 1]}">
       <div><span class="tag" style="background:${TONE[d.tone]}">${d.tag}</span> <span class="muted">${d.date}</span></div>
-      <div class="cost">本日人均 <b>${yen(d.cost)}</b> ≈ ${twd(d.cost)}</div>
+      <div class="cost">本日人均 <b>${yen(dayCost(n))}</b> ≈ ${twd(dayCost(n))}</div>
       <div class="pager">${n > 1 ? `<button data-day="${n - 1}">← D${n - 1}</button>` : '<span></span>'}${n < 8 ? `<button data-day="${n + 1}">D${n + 1} →</button>` : ''}</div>
     </div>
     ${d.checkpoint ? `<div class="checkpoint">⏰ <b>Checkpoint</b>　${d.checkpoint.when} → ${d.checkpoint.act}</div>` : ''}
@@ -188,6 +212,7 @@ function openDay(n) {
       <div class="tl"><span class="tl-i">${b.icon}</span><div><b>${b.title}</b>${b.items.length ? `<ul>${b.items.map((i) => `<li>${i}</li>`).join('')}</ul>` : ''}</div></div>`).join('')}
     </div>
     <div class="note">💡 ${d.tip}</div>
+    ${d.extra ? `<div class="note">🏮 ${d.extra}</div>` : ''}
     ${d.snow ? `<div class="note snow">❄️ 下雪時：${d.snow}</div>` : ''}
     <h3>景點意義與注意事項</h3>
     ${d.spots.map((s) => `<details class="card spot"><summary><b>${s.name}</b>${s.badge ? `<span class="badge">${s.badge}</span>` : ''}</summary>
@@ -279,3 +304,6 @@ function renderStatus() {
 }
 $('#nexttask').onclick = () => VIEWS.tasks();
 renderStatus();
+
+// ---------- 離線（Service Worker） ----------
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');

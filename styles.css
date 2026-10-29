@@ -158,8 +158,16 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
 #lightbox img { max-width: 92vw; max-height: 85vh; border-radius: 10px; }
 
 @media (max-width: 900px) {
-  .trip, .who, #carinfo, #countdown { display: none; }
-  .search input { width: 160px; }
+  .trip, .who, #carinfo, #countdown, .notice, .prog > b + .pbar { display: none; }
+  .top { gap: 8px; padding: 0 10px; }
+  .logo { white-space: nowrap; font-size: 16px; }
+  .search { flex: 1; } .search input { width: 100%; }
+  #results { width: min(320px, 90vw); }
+  .status { gap: 10px; padding: 0 10px; }
+  #daychips { overflow-x: auto; padding-left: 10px; scrollbar-width: none; }
+  #nexttask { display: none; }
+  .map-label { padding: 3px 8px; font-size: 12px; }
+  .map-label .meta { display: none; }
   #panel { left: 8px; right: 8px; width: auto; top: auto; bottom: 56px; height: 58vh; z-index: 16; }
   .rail { flex-direction: row; top: auto; bottom: 56px; left: 50%; transform: translateX(-50%); }
   #panel.open ~ .rail { display: none; }
@@ -167,3 +175,12 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
   .ctrl { bottom: 130px; }
   #nexttask { max-width: 140px; }
 }
+
+.rental .kv { display: flex; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.rental .kv span { width: 64px; flex: none; color: var(--muted); font-size: 12px; }
+.rental .kv b { font-weight: 500; }
+.checks { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.sos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sos .card { margin: 0; text-align: center; border-color: #fecaca; background: #fff5f5; }
+.sos b { font-size: 18px; color: #b91c1c; }
+.link-card:hover { border-color: var(--brand); }

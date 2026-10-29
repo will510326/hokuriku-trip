@@ -216,17 +216,19 @@ export function createWorld(container, { onPick }) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#dbeaf5');
-  scene.fog = new THREE.Fog('#dbeaf5', 60, 120);
+  scene.fog = new THREE.Fog('#dbeaf5', 110, 300);
 
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 400);
   const HOME = { pos: new THREE.Vector3(16, 33, 38), target: new THREE.Vector3(1.5, 0, -1.5) };
-  camera.position.copy(HOME.pos);
+  // 直式螢幕（手機）視角較窄，鏡頭拉遠
+  const homePos = () => { const a = container.clientWidth / container.clientHeight; const k = a < 1 ? Math.min(2.6, 1.1 / a) : 1; return HOME.pos.clone().sub(HOME.target).multiplyScalar(k).add(HOME.target); };
+  camera.position.copy(homePos());
 
   const controls = new OrbitControls(camera, labelRenderer.domElement);
   controls.target.copy(HOME.target);
   controls.enableDamping = true;
   controls.maxPolarAngle = Math.PI * 0.42;
-  controls.minDistance = 8; controls.maxDistance = 110;
+  controls.minDistance = 8; controls.maxDistance = 170;
 
   scene.add(new THREE.HemisphereLight('#ffffff', '#9fb4c8', 1.4));
   const sun = new THREE.DirectionalLight('#fff4e0', 2.2);
@@ -432,7 +434,7 @@ export function createWorld(container, { onPick }) {
 
   return {
     flyToPlace(key, dist) { const g = placeObjs[key].group; flyTo(g.position.clone(), dist); },
-    home() { fly = { from: camera.position.clone(), fromT: controls.target.clone(), to: HOME.pos.clone(), toT: HOME.target.clone(), k: 0 }; },
+    home() { fly = { from: camera.position.clone(), fromT: controls.target.clone(), to: homePos(), toT: HOME.target.clone(), k: 0 }; },
     zoom(f) { const off = camera.position.clone().sub(controls.target).multiplyScalar(f); fly = { from: camera.position.clone(), fromT: controls.target.clone(), to: controls.target.clone().add(off), toT: controls.target.clone(), k: 0 }; },
     highlightDay(n) {
       routeMeshes.forEach((g) => g.children.forEach((m) => { m.material.opacity = !n || g.userData.day === n ? 1 : 0.15; }));
