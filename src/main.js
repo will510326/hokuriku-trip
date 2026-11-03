@@ -17,11 +17,11 @@ const daysUntil = (iso) => Math.ceil((new Date(iso) - new Date()) / 86400000);
 // ---------- 行前任務（存在 localStorage） ----------
 const TASKS = [
   { id: 'ghibli', due: '2026-11-10', text: '搶吉卜力 1/20 Premium 平日票（台灣 13:00 開賣，先登入 Boo-Woo 會員）', tag: '票券' },
-  { id: 'onestay', due: '2026-12-14', text: '名古屋 OneStay 一宿：免費取消期限，確認是否付款鎖房', tag: '住宿' },
+  { id: 'onestay', due: '2026-12-14', text: '名古屋 OneStay（已訂）：免費取消期限 12/14 下午3:00', tag: '住宿' },
   { id: 'sakura', due: '2026-12-30', text: '高山櫻庵：免費取消期限', tag: '住宿' },
-  { id: 'kanazawa', due: '2026-12-31', text: '金澤 Airbnb 民宿下訂（可免費取消）', tag: '住宿' },
+  { id: 'kanazawa', due: '2027-01-11', text: '金澤 Airbnb（已訂）：免費取消期限 1/11 下午4:00', tag: '住宿' },
   { id: 'okada', due: '2027-01-14', text: '岡田旅館（預付）：免費取消期限', tag: '住宿' },
-  { id: 'lodge', due: '2027-01-14', text: '瀨戶 Lodge：免費取消期限', tag: '住宿' },
+  { id: 'lodge', due: '2027-01-14', text: '瀨戶 Lodge（已訂）：免費取消期限 1/14 下午3:00，之後不退款', tag: '住宿' },
   { id: 'idp', due: '2026-12-31', text: '申請國際駕照／日文譯本', tag: '自駕' },
   { id: 'rental', due: '2026-11-30', text: '租車下訂，並把租車公司、預約編號填進網站（src/data.js 的 RENTAL）', tag: '自駕' },
   { id: 'car', due: '2026-12-31', text: '租車：確認雪胎、加租雪鏈、冬季保險', tag: '自駕' },
@@ -111,10 +111,11 @@ const VIEWS = {
       <p class="lead">固定兩處連住兩晚，減少搬運行李；最後一晚住瀨戶（近吉卜力公園）。</p>
       ${STAYS.map((s) => `
         <div class="card stay">
-          <div class="stay-h"><span class="badge">${s.days}・${s.date}</span><span class="nights">${s.nights} 晚</span></div>
+          <div class="stay-h"><span class="badge">${s.days}・${s.date}</span>${s.booked ? `<span class="booked">✅ ${s.booked}</span>` : ''}<span class="nights">${s.nights} 晚</span></div>
           <a class="stay-n" href="${esc(s.url)}" target="_blank" rel="noopener">${s.name} ↗</a>
           <div class="where" data-place="${s.place}">📍 ${PLACES[s.place].name}（在地圖上看）</div>
           <div class="price">${s.price}${s.alt ? `<small>${s.alt}</small>` : ''}</div>
+          ${s.checkin ? `<div class="muted">🕒 ${s.checkin}</div>` : ''}
           <div class="muted">${s.note}</div>
         </div>`).join('')}
       <div class="note">⚠️ ${STAY_NOTE}</div>

@@ -128,6 +128,7 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
 
 .stay-h { display: flex; justify-content: space-between; }
 .nights { font-weight: 700; color: #6d28d9; font-size: 12px; }
+.booked { margin-left: auto; margin-right: 8px; font-size: 11px; color: #15803d; background: #dcfce7; border-radius: 6px; padding: 1px 7px; }
 .stay-n { display: block; font-weight: 700; font-size: 15px; margin: 6px 0 2px; color: var(--brand); text-decoration: none; }
 .where { font-size: 12px; color: var(--muted); cursor: pointer; } .where:hover { color: var(--brand); }
 .price { font-weight: 700; margin: 6px 0 4px; } .price small { font-weight: 400; display: inline; margin-left: 6px; }

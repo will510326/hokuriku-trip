@@ -26,16 +26,19 @@ export const PLACES = {
 };
 
 export const STAYS = [
-  { days: 'Day 1', date: '1/13', nights: 1, place: 'nagoya', name: 'OneStay一宿（一棟透天／2衛浴）', price: 'NT$7,183／晚（Airbnb）', alt: 'NT$13,775／晚（Booking）',
-    note: 'Airbnb｜12/14前可免費取消・地鐵站步行約2分，免費停車', url: 'https://www.airbnb.com.tw/rooms/1528779773337804943?check_in=2027-01-13&check_out=2027-01-14&adults=4' },
+  { days: 'Day 1', date: '1/13', nights: 1, place: 'nagoya', name: 'OneStay一宿（一棟透天／2衛浴）', price: 'NT$7,182.54（1晚・4人）',
+    booked: '已訂（Airbnb・2026/11/03 確認）', checkin: '入住 15:00 後／退房 11:00 前',
+    note: '12/14 下午3:00前可免費取消；1/6 下午3:00前取消可部分退款｜地鐵中村日赤站步行約2分，免費停車', url: 'https://www.airbnb.com.tw/rooms/1528779773337804943?check_in=2027-01-13&check_out=2027-01-14&adults=4' },
   { days: 'Day 2–3', date: '1/14–1/16', nights: 2, place: 'takayama', name: '高山櫻庵', price: 'NT$15,186（2房2晚）',
     note: '和風小型雙人房・12/30前可免費取消｜Trip.com｜近高山站／濃飛巴士站', url: 'https://tw.trip.com/hotels/detail/?cityId=3666&hotelId=704486&adult=4&crn=2&curr=TWD&locale=zh-TW' },
-  { days: 'Day 4–5', date: '1/16–1/18', nights: 2, place: 'kanazawa', name: 'Airbnb民宿（氣氛佳）', price: 'NT$11,222（2晚）',
-    note: '含所有費用・可免費取消｜Airbnb｜近金澤市區', url: 'https://www.airbnb.com.tw/rooms/801287174845574830?adults=4' },
+  { days: 'Day 4–5', date: '1/16–1/18', nights: 2, place: 'kanazawa', name: '百年古民家（兼六園步行5分）', price: 'NT$11,221.49（2晚・4人）',
+    booked: '已訂（Airbnb・2026/11/03 確認）', checkin: '入住 16:00 後／退房 11:00 前',
+    note: '1/11 下午4:00前可免費取消；1/16 下午4:00前取消可部分退款｜東兼六町，近兼六園', url: 'https://www.airbnb.com.tw/rooms/801287174845574830?adults=4' },
   { days: 'Day 6', date: '1/18–1/19', nights: 1, place: 'okuhida', name: '岡田旅館（和樂亭・大眾湯）', price: 'NT$15,439（2房1晚）',
     note: '含早晚餐・預付・1/14前可免費取消｜Booking｜雙人兩房・18:00前須入住才有晚餐', url: 'https://www.booking.com/hotel/jp/okada-ryokan.zh-tw.html?checkin=2027-01-18&checkout=2027-01-19&group_adults=4&no_rooms=2' },
-  { days: 'Day 7', date: '1/19–1/20', nights: 1, place: 'seto', name: 'Lodge 大型家庭（Airbnb）', price: 'NT$7,432（1晚）',
-    note: '1/14前可免費取消｜Airbnb｜4房1衛浴・距吉卜力約15分鐘・2個免費汽車位', url: 'https://www.airbnb.com.tw/rooms/1592377656966546679?check_in=2027-01-19&check_out=2027-01-20&adults=4&currency=TWD' },
+  { days: 'Day 7', date: '1/19–1/20', nights: 1, place: 'seto', name: 'Lodge 大型家庭', price: 'NT$7,431.44（1晚・4人）',
+    booked: '已訂（Airbnb・2026/11/03 確認）', checkin: '入住 15:00 後／退房 10:00 前（較早）',
+    note: '1/14 下午3:00前可免費取消，之後不退款｜4房1衛浴・距吉卜力約15分鐘・2個免費汽車位', url: 'https://www.airbnb.com.tw/rooms/1592377656966546679?check_in=2027-01-19&check_out=2027-01-20&adults=4&currency=TWD' },
 ];
 export const RENTAL = {
   // TODO: 預約後填入
@@ -45,7 +48,7 @@ export const RENTAL = {
   checks: ['雪胎（冬季胎）是否已含', '是否加租雪鏈＋使用教學', '4WD', '冬季保險／免責補償', '國際駕照（日文譯本）＋台灣駕照＋護照', 'ETC 卡'],
 };
 
-export const STAY_NOTE = '高山櫻庵、金澤、岡田旅館為10/11查詢，Airbnb為4人報價（OneStay為10/12–10/15、Lodge為10/26查詢）；Booking OneStay為9/30查詢，皆會浮動。尚未付款鎖房，建議先訂可免費取消的方案。';
+export const STAY_NOTE = '名古屋、金澤、瀨戶三間 Airbnb 已於 11/3 確認訂房（金額為 Airbnb 訂單總費用）；高山櫻庵、岡田旅館價格為 10/11 查詢。注意各自的免費取消期限。';
 
 // m = 'drive' | 'walk'
 const r = (from, to, m, t) => ({ from, to, m, t });
