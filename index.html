@@ -15,7 +15,10 @@
 <body>
   <header class="top">
     <div class="logo"><span>❄</span>Trip World</div>
-    <div class="trip">北陸・飛驒 冬季自駕（2027/1/13–20） <em>8天7夜</em></div>
+    <div class="trip-switch">
+      <button id="tripBtn" class="trip" aria-haspopup="listbox" aria-expanded="false" title="旅行時光機：切換行程"></button>
+      <div id="tripMenu" class="trip-menu" role="listbox" hidden></div>
+    </div>
     <div class="search">
       <input id="search" placeholder="搜尋地點、景點、美食…" autocomplete="off">
       <div id="results" hidden></div>

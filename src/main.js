@@ -1,5 +1,8 @@
 import { TRIP, PLACES, STAYS, STAY_NOTE, RENTAL, DAYS, BUDGET, RISKS, SNOW_STATS, DRIVING_RULES, FOOD, LINKS, EMERGENCY } from './data.js';
 import { createWorld, DAY_COLORS } from './scene.js';
+import { TRIPS, currentTrip, tripStatus, fmtRange } from './trips.js';
+
+const ACTIVE = currentTrip();
 
 const $ = (s, el = document) => el.querySelector(s);
 const yen = (n) => '¥' + n.toLocaleString();
@@ -28,8 +31,11 @@ const TASKS = [
   { id: 'gear', due: '2027-01-12', text: '防滑鞋、防寒衣物、暖暖包準備', tag: '裝備' },
   { id: 'ropeway', due: '2027-01-18', text: '前一晚查新穗高纜車「運行情報」與天氣', tag: '確認' },
 ];
-const doneSet = new Set(JSON.parse(localStorage.getItem('trip-tasks') || '[]'));
-const saveTasks = () => { localStorage.setItem('trip-tasks', JSON.stringify([...doneSet])); renderStatus(); };
+// 每趟行程分開存；舊版的 'trip-tasks' 自動搬到第一趟
+const TASK_KEY = `trip-tasks:${ACTIVE.id}`;
+if (!localStorage.getItem(TASK_KEY) && localStorage.getItem('trip-tasks')) localStorage.setItem(TASK_KEY, localStorage.getItem('trip-tasks'));
+const doneSet = new Set(JSON.parse(localStorage.getItem(TASK_KEY) || '[]'));
+const saveTasks = () => { localStorage.setItem(TASK_KEY, JSON.stringify([...doneSet])); renderStatus(); };
 
 // ---------- 3D 世界 ----------
 const world = createWorld($('#world'), { onPick: (key) => openPlace(key) });
@@ -328,3 +334,34 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
   navigator.serviceWorker.register('sw.js');
 }
+
+// ---------- 旅行時光機（切換行程） ----------
+const tripBtn = $('#tripBtn'), tripMenu = $('#tripMenu');
+document.title = `Trip World — ${ACTIVE.title}`;
+tripBtn.innerHTML = `<span class="flag" style="--fc:${ACTIVE.color}">${ACTIVE.country}</span><b>${ACTIVE.title}</b><span class="dates">${fmtRange(ACTIVE)}</span><em>${ACTIVE.length}</em><i class="caret">▾</i>`;
+function renderTripMenu() {
+  const years = [...new Set(TRIPS.map((t) => t.start.slice(0, 4)))].sort().reverse();
+  const totalDays = TRIPS.reduce((a, t) => a + Math.round((new Date(t.end) - new Date(t.start)) / 86400000) + 1, 0);
+  tripMenu.innerHTML = `
+    <div class="tm-head"><b>🕰️ 旅行時光機</b><small>共 ${TRIPS.length} 趟・${totalDays} 天</small></div>
+    ${years.map((y) => `<div class="tm-year">${y}</div>` + TRIPS.filter((t) => t.start.startsWith(y)).sort((a, b) => b.start.localeCompare(a.start)).map((t) => {
+      const st = tripStatus(t), on = t.id === ACTIVE.id;
+      return `<button class="tm-item ${on ? 'on' : ''}" role="option" aria-selected="${on}" data-trip="${t.id}">
+        <span class="flag" style="--fc:${t.color}">${t.country}</span>
+        <span class="tm-main"><b>${t.title}</b><small>${t.place}・${fmtRange(t)}・${t.length}</small></span>
+        <span class="tm-st ${st.key}">${st.label}</span>${on ? '<span class="tm-check">✓</span>' : ''}
+      </button>`;
+    }).join('')).join('')}
+    <div class="tm-add">＋ 下一趟旅程<small>把新的行程簡報交給 Claude，就會加進時光機</small></div>`;
+  tripMenu.querySelectorAll('[data-trip]').forEach((b) => (b.onclick = () => {
+    if (b.dataset.trip === ACTIVE.id) return toggleTripMenu(false);
+    const u = new URL(location.href); u.searchParams.set('trip', b.dataset.trip); location.href = u.toString();
+  }));
+}
+function toggleTripMenu(open = tripMenu.hidden) {
+  if (open) renderTripMenu();
+  tripMenu.hidden = !open; tripBtn.setAttribute('aria-expanded', String(open));
+}
+tripBtn.onclick = (e) => { e.stopPropagation(); toggleTripMenu(); };
+document.addEventListener('click', (e) => { if (!e.target.closest('.trip-switch')) toggleTripMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') toggleTripMenu(false); });
