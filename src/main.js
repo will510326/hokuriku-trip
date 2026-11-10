@@ -16,7 +16,7 @@ const daysUntil = (iso) => Math.ceil((new Date(iso) - new Date()) / 86400000);
 
 // ---------- 行前任務（存在 localStorage） ----------
 const TASKS = [
-  { id: 'ghibli', due: '2026-11-10', text: '搶吉卜力 1/20 Premium 平日票（台灣 13:00 開賣，先登入 Boo-Woo 會員）', tag: '票券' },
+  { id: 'ghibli', due: '2026-11-10', text: '吉卜力 1/20 Standard 平日票（已在 Klook 購買）', tag: '票券', done: true },
   { id: 'onestay', due: '2026-12-14', text: '名古屋 OneStay（已訂）：免費取消期限 12/14 下午3:00', tag: '住宿' },
   { id: 'sakura', due: '2026-12-30', text: '高山櫻庵：免費取消期限', tag: '住宿' },
   { id: 'kanazawa', due: '2027-01-11', text: '金澤 Airbnb（已訂）：免費取消期限 1/11 下午4:00', tag: '住宿' },
@@ -35,6 +35,7 @@ const TASKS = [
 const TASK_KEY = `trip-tasks:${ACTIVE.id}`;
 if (!localStorage.getItem(TASK_KEY) && localStorage.getItem('trip-tasks')) localStorage.setItem(TASK_KEY, localStorage.getItem('trip-tasks'));
 const doneSet = new Set(JSON.parse(localStorage.getItem(TASK_KEY) || '[]'));
+TASKS.forEach((t) => t.done && doneSet.add(t.id)); // 已確定完成的任務
 const saveTasks = () => { localStorage.setItem(TASK_KEY, JSON.stringify([...doneSet])); renderStatus(); };
 
 // ---------- 3D 世界 ----------
@@ -319,7 +320,7 @@ function renderStatus() {
   $('#pct').textContent = pct + '%';
   $('#pctbar').style.width = pct + '%';
   const d = daysUntil(TRIP.start), g = daysUntil(TRIP.ghibliSale);
-  $('#countdown').innerHTML = `✈️ 距出發 <b>${Math.max(d, 0)}</b> 天` + (g >= 0 ? `　🎟️ 吉卜力搶票 <b>${g}</b> 天後（11/10 13:00）` : '');
+  $('#countdown').innerHTML = `✈️ 距出發 <b>${Math.max(d, 0)}</b> 天` + (g >= 0 && !doneSet.has('ghibli') ? `　🎟️ 吉卜力搶票 <b>${g}</b> 天後（11/10 13:00）` : '');
   const next = [...TASKS].filter((t) => !doneSet.has(t.id)).sort((a, b) => a.due.localeCompare(b.due))[0];
   $('#nexttask').textContent = next ? `下一件事：${next.text.split('（')[0]}（${next.due.slice(5).replace('-', '/')}）` : '行前任務全部完成 🎉';
   $('#taskdot').textContent = TASKS.length - doneSet.size;
