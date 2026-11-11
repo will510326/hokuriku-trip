@@ -7,7 +7,7 @@ export const PLINTH_R = 1.42 * PLACE_SCALE; // 六角台座半徑（世界座標
 export const NO_PLINTH = new Set(['ropeway', 'airport']);
 
 // 經緯度 → 世界座標（為了畫面好看，部分地點略微挪動；金澤往內陸移，台座才不會懸在海上）
-const NUDGE = { ghibli: [3.4, 2.4], shinhotaka: [0.6, -1.2], furukawa: [-0.2, -3.2], kanazawa: [1.9, 1.3] };
+const NUDGE = { ghibli: [3.4, 2.4], shinhotaka: [0.6, -1.2], furukawa: [-1.2, -3.2], kanazawa: [1.9, 1.3], kamioka: [0.9, -0.4], okuhida: [-1.6, 1.0] };
 export function proj(key) {
   const p = PLACES[key];
   const [nx, nz] = NUDGE[key] || [0, 0];

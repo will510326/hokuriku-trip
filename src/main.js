@@ -20,7 +20,9 @@ const TASKS = [
   { id: 'onestay', due: '2026-12-14', text: '名古屋 OneStay（已訂）：免費取消期限 12/14 下午3:00', tag: '住宿' },
   { id: 'sakura', due: '2026-12-30', text: '高山櫻庵：免費取消期限', tag: '住宿' },
   { id: 'kanazawa', due: '2027-01-11', text: '金澤 Airbnb（已訂）：免費取消期限 1/11 下午4:00', tag: '住宿' },
-  { id: 'okada', due: '2027-01-14', text: '岡田旅館（預付）：免費取消期限', tag: '住宿' },
+  { id: 'okada', due: '2027-01-14', text: '取消岡田旅館（預付，1/14 前免費取消；Day 6 已改住中尾平）', tag: '住宿' },
+  { id: 'nakao', due: '2027-01-11', text: '中尾平：確認訂房，並告知約 19:00 後才到（晚到入住）', tag: '住宿' },
+  { id: 'kamioka', due: '2027-01-10', text: '神岡 1/18 晚餐：確認營業或訂位（小鎮店少、打烊早）', tag: '餐廳' },
   { id: 'lodge', due: '2027-01-14', text: '瀨戶 Lodge（已訂）：免費取消期限 1/14 下午3:00，之後不退款', tag: '住宿' },
   { id: 'idp', due: '2026-12-31', text: '申請國際駕照／日文譯本', tag: '自駕' },
   { id: 'rental', due: '2026-11-30', text: '租車下訂，並把租車公司、預約編號填進網站（src/data.js 的 RENTAL）', tag: '自駕' },
@@ -71,7 +73,7 @@ function closePanel() {
 const VIEWS = {
   overview() {
     const d = daysUntil(TRIP.start);
-    const chain = ['airport', 'nagoya', 'gujo', 'takayama', 'shirakawa', 'kanazawa', 'furukawa', 'okuhida', 'shinhotaka', 'seto', 'ghibli', 'airport'];
+    const chain = ['airport', 'nagoya', 'gujo', 'takayama', 'shirakawa', 'kanazawa', 'furukawa', 'kamioka', 'okuhida', 'shinhotaka', 'seto', 'ghibli', 'airport'];
     show('overview', `
       <div class="hero">
         <div class="hero-t">${TRIP.title}</div>

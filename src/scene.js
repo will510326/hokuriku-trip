@@ -123,6 +123,16 @@ const BUILDERS = {
     people(g, [[0, 0.72], [0.32, 0.8], [-0.4, 0.82], [0.55, -0.9], [-0.7, 0.05]]);
     return g;
   },
+  keep() { // 神岡城：石垣上的小天守＋城下町家
+    const g = new THREE.Group();
+    g.add(box(0.9, 0.24, 0.8, M.stone, -0.2, 0, -0.2));
+    g.add(box(0.56, 0.26, 0.48, M.wall, -0.2, 0.24, -0.2)); g.add(pyramid(0.78, 0.18, M.dark, -0.2, 0.5, -0.2));
+    g.add(box(0.36, 0.2, 0.32, M.wall, -0.2, 0.64, -0.2)); g.add(pyramid(0.54, 0.18, M.dark, -0.2, 0.84, -0.2));
+    g.add(house(0.55, 0.6, Math.PI, M.wood)); g.add(house(-0.4, 0.68, Math.PI, M.wood));
+    g.add(pine(0.75, -0.45, 0.9)); g.add(pine(0.45, -0.8, 0.7)); g.add(lantern(0.3, 0.15));
+    people(g, [[0.1, 0.3], [0.5, 0.12]]);
+    return g;
+  },
   town() { // 兩排房子夾一條水道，水道上有小橋
     const g = new THREE.Group();
     [[-0.6, -0.5], [0.04, -0.56], [0.66, -0.46]].forEach(([x, z]) => g.add(house(x, z, 0)));
