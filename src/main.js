@@ -1,6 +1,7 @@
 import { TRIP, PLACES, STAYS, STAY_NOTE, RENTAL, DAYS, BUDGET, RISKS, SNOW_STATS, DRIVING_RULES, FOOD, LINKS, EMERGENCY } from './data.js';
 import { createWorld, DAY_COLORS } from './scene.js';
 import { TRIPS, currentTrip, tripStatus, fmtRange } from './trips.js';
+import { createLedger, CATS } from './ledger.js';
 
 const ACTIVE = currentTrip();
 
@@ -55,6 +56,7 @@ const TASK_KEY = `trip-tasks:${ACTIVE.id}`;
 if (!localStorage.getItem(TASK_KEY) && localStorage.getItem('trip-tasks')) localStorage.setItem(TASK_KEY, localStorage.getItem('trip-tasks'));
 const doneSet = new Set(JSON.parse(localStorage.getItem(TASK_KEY) || '[]'));
 TASKS.forEach((t) => t.done && doneSet.add(t.id)); // 已確定完成的任務
+const ledger = createLedger(ACTIVE.id, TRIP.rate);
 const saveTasks = () => { localStorage.setItem(TASK_KEY, JSON.stringify([...doneSet])); renderStatus(); };
 
 // ---------- 3D 世界 ----------
@@ -204,6 +206,79 @@ const VIEWS = {
       <div class="note">📶 這個網站支援離線：在手機上用瀏覽器打開一次後「加到主畫面」，山區沒訊號也能看行程（外部連結仍需網路）。</div>
     `, '實用資訊');
   },
+  ledger() {
+    const L = ledger, D = L.data, s = L.summary(), t = L.settle(), nt = (v) => 'NT$' + Math.round(v).toLocaleString();
+    const est = TOTAL * TRIP.rate, per = s.total / D.members.length;
+    const opt = (arr, sel) => arr.map((m, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(m)}</option>`).join('');
+    const dayName = (n) => (n ? `Day ${n}・${DAYS[n - 1].date}` : '行前（訂房、門票等）');
+    const groups = [0, ...DAYS.map((d) => d.n)].map((n) => [n, D.items.filter((x) => x.day === n)]).filter(([, a]) => a.length);
+    show('ledger', `
+      <p class="lead">記下誰付了什麼，自動算出每個人該給誰多少。資料只存在這台手機，用下面的「分享」傳給其他人。</p>
+      <div class="kpi-grid">
+        <div class="card kpi"><span>目前總花費</span><b>${nt(s.total)}</b><small>${D.items.length} 筆</small></div>
+        <div class="card kpi"><span>平均每人</span><b>${nt(per)}</b><small>預估 ${nt(est)}（${est ? Math.round((per / est) * 100) : 0}%）</small></div>
+      </div>
+      <h3>➕ 新增一筆</h3>
+      <form class="card lform" id="lform">
+        <input name="desc" placeholder="項目，例如：高山晚餐" required maxlength="40">
+        <div class="lrow"><input name="amt" type="number" inputmode="decimal" min="1" step="any" placeholder="金額" required>
+          <select name="cur"><option value="JPY">¥ 日圓</option><option value="TWD">NT$ 台幣</option></select></div>
+        <div class="lrow"><label>誰付的<select name="payer">${opt(D.members, 0)}</select></label>
+          <label>分類<select name="cat">${CATS.map((c) => `<option${c === '餐飲' ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
+        <label>哪一天<select name="day">${[0, ...DAYS.map((d) => d.n)].map((n) => `<option value="${n}"${n === todayN() ? ' selected' : ''}>${dayName(n)}</option>`).join('')}</select></label>
+        <div class="lsplit"><span>分給誰</span>${D.members.map((m, i) => `<label><input type="checkbox" name="split" value="${i}" checked>${esc(m)}</label>`).join('')}</div>
+        <button class="lbtn primary">加入</button>
+      </form>
+      <h3>💸 結算（誰該給誰）</h3>
+      ${t.length ? t.map((x) => `<div class="card settle"><span>${esc(D.members[x.from])} <i>→</i> ${esc(D.members[x.to])}</span><b>${nt(x.amt)}</b></div>`).join('')
+        : `<div class="card muted">${D.items.length ? '已經結清，不用轉帳 🎉' : '還沒有任何紀錄'}</div>`}
+      <h3>👥 每個人</h3>
+      <div class="card ltable">
+        <div class="lt-h"><span>成員</span><span>已付</span><span>應付</span><span>差額</span></div>
+        ${D.members.map((m, i) => `<div><span>${esc(m)}</span><span>${nt(s.paid[i])}</span><span>${nt(s.share[i])}</span><span class="${s.balance[i] >= 0 ? 'pos' : 'neg'}">${s.balance[i] >= 0 ? '+' : '−'}${nt(Math.abs(s.balance[i])).slice(3)}</span></div>`).join('')}
+      </div>
+      <div class="muted small">差額為正：別人要給他；為負：他要給別人。</div>
+      ${D.items.length ? `<h3>📊 分類（全部人合計）</h3><div class="card">${CATS.filter((c) => s.byCat[c]).map((c) => `<div class="kv"><span>${c}</span><b>${nt(s.byCat[c])}</b></div>`).join('')}</div>` : ''}
+      <h3>🧾 明細</h3>
+      ${groups.length ? groups.map(([n, items]) => `<div class="muted small lday">${dayName(n)}</div>${items.map((x) => `
+        <div class="card litem"><div><b>${esc(x.desc)}</b><small>${esc(D.members[x.payer] ?? '?')} 付・${x.split.length === D.members.length ? '全部人分' : '分給 ' + x.split.map((i) => esc(D.members[i] ?? '?')).join('、')}・${x.cat}</small></div>
+          <div class="lamt"><b>${x.cur === 'JPY' ? yen(x.amt) : nt(x.amt)}</b>${x.cur === 'JPY' ? `<small>≈ ${nt(L.toTwd(x))}</small>` : ''}</div>
+          <button class="ldel" data-del="${x.id}" aria-label="刪除 ${esc(x.desc)}">✕</button></div>`).join('')}`).join('') : '<div class="card muted">還沒有任何紀錄</div>'}
+      <h3>⚙️ 設定</h3>
+      <div class="card">
+        <div class="muted small">成員名字（只存在這台手機，不會公開）</div>
+        <div class="lnames">${D.members.map((m, i) => `<input data-member="${i}" value="${esc(m)}" maxlength="12" aria-label="成員 ${i + 1} 名字">`).join('')}</div>
+        <label class="lrate">匯率 ¥1 ≈ NT$ <input id="lrate" type="number" step="0.001" min="0.01" value="${D.rate}"></label>
+      </div>
+      <div class="lactions">
+        <button class="lbtn" id="lshare">🔗 分享帳本連結</button>
+        <button class="lbtn" id="lcopy">📋 複製結算文字</button>
+        <button class="lbtn danger" id="lclear">🗑 清空紀錄</button>
+      </div>
+      <div class="note">📱 帳本不會自動同步。建議固定一個人記帳，要對帳時按「分享帳本連結」傳給其他人；對方打開連結後可以選擇載入（會取代他手機上原本的帳本）。</div>
+    `, '記帳・分帳');
+    const form = $('#lform', panel);
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const f = new FormData(form), split = f.getAll('split').map(Number), amt = +f.get('amt');
+      if (!split.length) return alert('至少要勾選一個人來分攤');
+      if (!(amt > 0)) return;
+      L.add({ desc: f.get('desc').trim(), amt, cur: f.get('cur'), payer: +f.get('payer'), cat: f.get('cat'), day: +f.get('day'), split });
+      VIEWS.ledger();
+    };
+    panel.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => { if (confirm('刪除這筆紀錄？')) { L.remove(b.dataset.del); VIEWS.ledger(); } }));
+    panel.querySelectorAll('[data-member]').forEach((i) => (i.onchange = () => { L.setMember(+i.dataset.member, i.value); VIEWS.ledger(); }));
+    $('#lrate', panel).onchange = (e) => { L.setRate(+e.target.value); VIEWS.ledger(); };
+    const flash = (b, msg) => { const o = b.textContent; b.textContent = msg; setTimeout(() => (b.textContent = o), 1600); };
+    const copy = async (text, b) => { try { await navigator.clipboard.writeText(text); flash(b, '✅ 已複製'); } catch { prompt('請手動複製：', text); } };
+    $('#lshare', panel).onclick = async (e) => {
+      const url = L.shareUrl();
+      if (navigator.share) { try { await navigator.share({ title: '旅費帳本', url }); return; } catch { /* 取消分享就改用複製 */ } }
+      copy(url, e.currentTarget);
+    };
+    $('#lcopy', panel).onclick = (e) => copy(L.text(nt), e.currentTarget);
+    $('#lclear', panel).onclick = () => { if (confirm(`清空全部 ${D.items.length} 筆紀錄？成員名字會保留。這個動作無法復原。`)) { L.clear(); VIEWS.ledger(); } };
+  },
   tasks() {
     const sorted = [...TASKS].sort((a, b) => a.due.localeCompare(b.due));
     show('tasks', `
@@ -230,7 +305,7 @@ function dayCard(d) {
   </button>`;
 }
 
-const BACK_LABELS = { overview: '總覽', days: '每日行程', budget: '預算', snow: '雪況應變', stays: '住宿', food: '美食', tasks: '任務', info: '資訊' };
+const BACK_LABELS = { ledger: '記帳', overview: '總覽', days: '每日行程', budget: '預算', snow: '雪況應變', stays: '住宿', food: '美食', tasks: '任務', info: '資訊' };
 function openDay(n) {
   // 從清單頁進來時記住返回目標；在各天之間切換（D3→D5）則沿用
   if (!current || !current.startsWith('days:')) {
@@ -349,8 +424,18 @@ function renderStatus() {
 $('#nexttask').onclick = () => VIEWS.tasks();
 renderStatus();
 
+// 打開別人分享的帳本連結：先問過再載入，然後把網址上的資料拿掉
+{
+  const shared = ledger.parse(location.hash);
+  if (location.hash.includes('ledger=')) {
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!shared) alert('這個帳本連結讀不出來，可能被截斷了。請對方重新分享一次。');
+    else if (confirm(`載入分享的帳本？（${shared.items.length} 筆紀錄）\n這會取代這台手機上原本的 ${ledger.data.items.length} 筆紀錄。`)) { ledger.replace(shared); VIEWS.ledger(); }
+  }
+}
+
 // 旅行期間：一打開就直接顯示今天，場景跟著日本時間切換白天／黃昏／夜晚
-if (todayN()) {
+if (todayN() && current !== 'ledger') {
   back = { label: '每日行程', go: () => VIEWS.days() };
   openDay(todayN());
   $('#countdown').style.cursor = 'pointer';

@@ -177,6 +177,31 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
 #daychips button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 2px 8px; font-size: 12px; font-weight: 700; color: var(--c); }
 #daychips button.car { background: var(--c); color: #fff; border-color: var(--c); }
 #daychips button.today { box-shadow: 0 0 0 2px var(--brand); }
+.lform { display: grid; gap: 8px; }
+.lform input, .lform select, .lnames input, .lrate input { font: inherit; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: #fff; width: 100%; min-width: 0; }
+.lform label { display: grid; gap: 3px; font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.lrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lsplit { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 13px; }
+.lsplit > span { font-size: 11.5px; color: var(--muted); font-weight: 700; width: 100%; }
+.lsplit label { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 13.5px; color: var(--text); font-weight: 500; min-height: 32px; }
+.lsplit input { width: 18px; height: 18px; padding: 0; }
+.lbtn { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 700; font-size: 13.5px; min-height: 44px; }
+.lbtn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.lbtn.danger { color: #dc2626; border-color: #fecaca; }
+.lactions { display: grid; gap: 8px; margin-top: 12px; }
+.settle { display: flex; justify-content: space-between; align-items: center; font-weight: 600; background: #fff4ec; border-color: var(--brand); }
+.settle i { font-style: normal; color: var(--brand); margin: 0 4px; } .settle b { font-size: 16px; }
+.ltable > div { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 4px; padding: 5px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.ltable > div span:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.ltable .lt-h { border-top: 0; color: var(--muted); font-size: 11.5px; font-weight: 700; }
+.ltable .pos { color: #059669; font-weight: 700; } .ltable .neg { color: #dc2626; font-weight: 700; }
+.lday { margin: 10px 0 4px; font-weight: 700; }
+.litem { display: flex; align-items: center; gap: 8px; }
+.litem > div:first-child { flex: 1; min-width: 0; } .lamt { text-align: right; white-space: nowrap; }
+.ldel { border: 0; background: none; color: var(--muted); width: 36px; height: 36px; border-radius: 8px; flex: none; }
+.ldel:hover { background: #fee2e2; color: #dc2626; }
+.lnames { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 10px; }
+.lrate { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; } .lrate input { width: 100px; }
 .today { margin-top: 10px; background: #fff4ec; border: 2px solid var(--brand); border-radius: 16px; padding: 12px; }
 .today-h { font-weight: 800; font-size: 16px; color: var(--brand); display: flex; justify-content: space-between; align-items: baseline; }
 .today-h small { color: var(--muted); font-weight: 500; font-size: 12px; }
@@ -212,7 +237,8 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
   #panel { left: 8px; right: 8px; width: auto; top: auto; bottom: 56px; height: 58vh; z-index: 16; }
   .rail { flex-direction: row; top: auto; bottom: 56px; left: 50%; transform: translateX(-50%); }
   #panel.open ~ .rail { display: none; }
-  .rail button { width: 40px; height: 46px; }
+  .rail { gap: 2px; padding: 6px; }
+  .rail button { width: 37px; height: 46px; }
   .ctrl { bottom: 130px; }
   #nexttask { max-width: 140px; }
 }
@@ -230,3 +256,4 @@ details p { margin: 8px 0 0; font-size: 12.5px; line-height: 1.6; }
 #world[data-time=night] .map-label { background: #2b2f45; border-color: #2b2f45; color: #f5ede4; }
 #world[data-time=night] .map-label .meta { color: #b8b0c8; }
 #world[data-time=night] .map-label.active { border-color: var(--brand); }
+.card > .kv { display: flex; justify-content: space-between; padding: 4px 0; }
