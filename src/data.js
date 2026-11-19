@@ -50,7 +50,7 @@ export const RENTAL = {
   checks: ['雪胎（冬季胎）是否已含', '是否加租雪鏈＋使用教學', '4WD', '冬季保險／免責補償', '國際駕照（日文譯本）＋台灣駕照＋護照', 'ETC 卡'],
 };
 
-export const STAY_NOTE = '名古屋、金澤、瀨戶三間 Airbnb 已於 11/3 確認訂房（金額為 Airbnb 訂單總費用）；高山櫻庵價格為 10/11 查詢。Day 6 已從岡田旅館改住中尾平（岡田旅館為預付，1/14 前可免費取消）。注意各自的免費取消期限。';
+export const STAY_NOTE = '名古屋、金澤、瀨戶三間 Airbnb 已於 11/3 確認訂房（金額為 Airbnb 訂單總費用）；高山櫻庵價格為 10/11 查詢。Day 6 已從岡田旅館改住中尾平（Booking 已訂；岡田旅館已取消）。注意各自的免費取消期限。';
 
 // m = 'drive' | 'walk'
 const r = (from, to, m, t) => ({ from, to, m, t });
