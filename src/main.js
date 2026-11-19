@@ -9,10 +9,27 @@ const yen = (n) => '¥' + n.toLocaleString();
 const twd = (n) => 'NT$' + Math.round(n * TRIP.rate).toLocaleString();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const gmap = (r) => `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(r.from)}&destination=${encodeURIComponent(r.to)}&travelmode=${r.m === 'walk' ? 'walking' : 'driving'}`;
+const gmapHere = (r) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(r.to)}&travelmode=${r.m === 'walk' ? 'walking' : 'driving'}`; // 從目前位置出發
 const TONE = { blue: '#3b82f6', amber: '#f59e0b', green: '#10b981', red: '#ef4444' };
 const dayCost = (n) => BUDGET.rows[n - 1].reduce((a, b) => a + b, 0);
 const TOTAL = DAYS.reduce((a, d) => a + dayCost(d.n), 0);
 const daysUntil = (iso) => Math.ceil((new Date(iso) - new Date()) / 86400000);
+
+// ---------- 當天模式 ----------
+// 以日本時間判斷今天是第幾天；網址加 ?today=2027-01-18 可以預覽某一天
+const TODAY_Q = new URLSearchParams(location.search).get('today');
+const jstDate = () => (/^\d{4}-\d{2}-\d{2}$/.test(TODAY_Q || '') ? TODAY_Q : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date()));
+const todayN = () => { const n = Math.round((Date.parse(jstDate()) - Date.parse(TRIP.start)) / 86400000) + 1; return n >= 1 && n <= DAYS.length ? n : 0; };
+function todayCard(n) {
+  const d = DAYS[n - 1], next = DAYS[n], stay = d.stay && STAYS.find((s) => s.place === d.stay);
+  return `<div class="today">
+    <div class="today-h">📍 今天・Day ${n}／${DAYS.length}<small>${d.date}${TODAY_Q ? '（預覽）' : ''}</small></div>
+    ${d.routes.length ? `<div class="today-l">今天的導航（從目前位置出發）</div>${d.routes.map((r) => `<a class="go" href="${gmapHere(r)}" target="_blank" rel="noopener"><span>${r.m === 'walk' ? '🚶' : '🚗'} ${r.to}</span><b>${r.t} ▸</b></a>`).join('')}` : ''}
+    ${stay ? `<div class="today-l">今晚住宿</div><a class="go stay-go" href="${esc(stay.url)}" target="_blank" rel="noopener"><span>🛏 ${stay.name}${stay.checkin ? `<small>${stay.checkin}</small>` : ''}</span><b>訂房頁 ▸</b></a>`
+      : `<div class="today-l">今晚</div><div class="go"><span>🛫 ${TRIP.flights.out}</span></div>`}
+    ${next ? `<button class="today-next" data-day="${n + 1}">明天 Day ${n + 1}：${next.title}<small>${next.blocks[0].title}</small></button>` : ''}
+  </div>`;
+}
 
 // ---------- 行前任務（存在 localStorage） ----------
 const TASKS = [
@@ -229,6 +246,7 @@ function openDay(n) {
       <div class="cost">本日人均 <b>${yen(dayCost(n))}</b> ≈ ${twd(dayCost(n))}</div>
       <div class="pager">${n > 1 ? `<button data-day="${n - 1}">← D${n - 1}</button>` : '<span></span>'}${n < 8 ? `<button data-day="${n + 1}">D${n + 1} →</button>` : ''}</div>
     </div>
+    ${n === todayN() ? todayCard(n) : ''}
     ${d.checkpoint ? `<div class="checkpoint">⏰ <b>Checkpoint</b>　${d.checkpoint.when} → ${d.checkpoint.act}</div>` : ''}
     <div class="timeline">${d.blocks.map((b) => `
       <div class="tl"><span class="tl-i">${b.icon}</span><div><b>${b.title}</b>${b.items.length ? `<ul>${b.items.map((i) => `<li>${i}</li>`).join('')}</ul>` : ''}</div></div>`).join('')}
@@ -244,7 +262,7 @@ function openDay(n) {
     <div class="muted small">Google 地圖一般路況估計，未含積雪，冬季請再加 30–50%。</div>
     <h3>路線截圖</h3>
     <div class="shots">${d.shots.map((s, i) => `<img data-zoom src="img/routes/shot${s}.jpg" alt="Day ${n} 路線 ${i + 1}" loading="lazy">`).join('')}</div>
-  `, `Day ${n}｜${d.title}`);
+  `, `${n === todayN() ? '📍今天 ' : ''}Day ${n}｜${d.title}`);
 }
 
 function openPlace(key) {
@@ -308,7 +326,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#ligh
 // ---------- 底部狀態列 ----------
 const dayChips = $('#daychips');
 dayChips.innerHTML = DAYS.map((d) => `<button data-day="${d.n}" style="--c:${DAY_COLORS[d.n - 1]}" title="${d.title}">D${d.n}</button>`).join('');
-dayChips.querySelectorAll('button').forEach((b) => (b.onclick = () => openDay(+b.dataset.day)));
+dayChips.querySelectorAll('button').forEach((b) => { b.onclick = () => openDay(+b.dataset.day); b.classList.toggle('today', +b.dataset.day === todayN()); });
 let lastDay = 0;
 world.onCarMove((t) => {
   const n = world.dayAtCar(t);
@@ -322,13 +340,27 @@ function renderStatus() {
   $('#pct').textContent = pct + '%';
   $('#pctbar').style.width = pct + '%';
   const d = daysUntil(TRIP.start), g = daysUntil(TRIP.ghibliSale);
-  $('#countdown').innerHTML = `✈️ 距出發 <b>${Math.max(d, 0)}</b> 天` + (g >= 0 && !doneSet.has('ghibli') ? `　🎟️ 吉卜力搶票 <b>${g}</b> 天後（11/10 13:00）` : '');
+  const tn = todayN();
+  $('#countdown').innerHTML = (tn ? `📍 旅行中・今天 <b>Day ${tn}</b>` : d > 0 ? `✈️ 距出發 <b>${d}</b> 天` : '🏠 旅程結束') + (g >= 0 && !doneSet.has('ghibli') ? `　🎟️ 吉卜力搶票 <b>${g}</b> 天後（11/10 13:00）` : '');
   const next = [...TASKS].filter((t) => !doneSet.has(t.id)).sort((a, b) => a.due.localeCompare(b.due))[0];
   $('#nexttask').textContent = next ? `下一件事：${next.text.split('（')[0]}（${next.due.slice(5).replace('-', '/')}）` : '行前任務全部完成 🎉';
   $('#taskdot').textContent = TASKS.length - doneSet.size;
 }
 $('#nexttask').onclick = () => VIEWS.tasks();
 renderStatus();
+
+// 旅行期間：一打開就直接顯示今天，場景跟著日本時間切換白天／黃昏／夜晚
+if (todayN()) {
+  back = { label: '每日行程', go: () => VIEWS.days() };
+  openDay(todayN());
+  $('#countdown').style.cursor = 'pointer';
+  $('#countdown').onclick = () => openDay(todayN());
+  if (!TODAY_Q) {
+    const h = +new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', hour12: false }).format(new Date());
+    const i = h >= 18 || h < 6 ? 2 : h >= 16 ? 1 : 0;
+    world.setTime(TOD[i][0]); $('#tod').textContent = TOD[i][1];
+  }
+}
 
 // ---------- 離線（Service Worker） ----------
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
